@@ -19,7 +19,7 @@ const Navbar = () => {
       <div className="nav-container">
         <div className="logo">
           <span className="logo-icon">🚀</span>
-          ProjectHub
+          ProjectX
         </div>
         
         <div className={`nav-menu ${isMenuOpen ? "active" : ""}`}>
