@@ -17,7 +17,7 @@ Primary features and flows:
 - After successful purchase, buyers receive access to downloadable assets or a delivery link (assets/media handled via Cloudinary and/or Drive integrations in `Utils/`).
 - Firestore (Firebase Admin) is used as the main data store for projects, purchases, and user-related metadata; Supabase helpers exist for additional storage or operations.
 
-This README assumes the codebase implements a single-owner storefront (your projects). If you'd like different wording (for example: commercial store, portfolio shop, or a course/paywall site), provide a short blurb and I'll update the description to match your preferred phrasing.
+
 
 ## Repository layout
 
@@ -100,22 +100,6 @@ The backend listens on the port set in `PORT` or 5000 by default. The frontend d
 }
 ```
 
-## Next steps / suggestions
 
-- Add a `.env.example` in `backend/` listing required env variables so contributors know what to set.
-- Add a `start` script to `backend/package.json` and consider using `nodemon` for development.
-- Move secrets to environment variables or a secrets manager before publishing the repository.
 
-## Where to get help
 
-If you need specifics about an endpoint, open the files under `backend/Routes/` (for example `Routes/purchases.js`) to see how routes work and what request bodies are expected.
-
----
-
-If you'd like, I can:
-
-- generate a `.env.example` with the env keys referenced above,
-- add a `start` script to `backend/package.json`, or
-- document a few endpoints with examples in this README.
-
-Tell me which of those you'd like next.
