@@ -11,8 +11,12 @@ const PurchasePage = () => {
   const [purchasing, setPurchasing] = useState(false);
   const [showDescription, setShowDescription] = useState(false);
 
+  const [showForm, setShowForm] = useState(false);
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
+
+  const [showOtpForm, setShowOtpForm] = useState(false);
+  const [otp, setOtp] = useState('');
 
   const descriptionRef = useRef(null);
 
@@ -35,36 +39,64 @@ const PurchasePage = () => {
     setShowDescription(willShow);
     setTimeout(() => {
       if (willShow && descriptionRef.current) {
-        descriptionRef.current.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'start'
-        });
+        descriptionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }, 100);
   };
 
-  const closeDescription = () => {
-    setShowDescription(false);
-  };
+  const closeDescription = () => setShowDescription(false);
 
-  const handlePurchase = async () => {
+  const startPurchase = () => setShowForm(true);
+
+  // Step 1: Submit Name + Email, then send OTP
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
     if (!userName || !userEmail) {
-      alert("Please enter your name and email before purchasing.");
+      alert("Please enter your name and email");
       return;
     }
 
-    setPurchasing(true);
+    try {
+      await axios.post("http://localhost:5000/otp/send", { email: userEmail });
+      setShowForm(false);
+      setShowOtpForm(true);
+    } catch (err) {
+      console.error("OTP send error:", err);
+      alert("Failed to send OTP. Try again.");
+    }
+  };
+
+  // Step 2: Verify OTP, then open Razorpay
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    if (!otp) {
+      alert("Please enter the OTP");
+      return;
+    }
 
     try {
-      // Create order on backend
+      await axios.post("http://localhost:5000/otp/verify", {
+        email: userEmail,
+        otp,
+      });
+      setShowOtpForm(false);
+      openRazorpay();
+    } catch (err) {
+      console.error("OTP verification error:", err);
+      alert(err.response?.data?.error || "Invalid OTP");
+    }
+  };
+
+  const openRazorpay = async () => {
+    setPurchasing(true);
+    try {
       const orderRes = await axios.post("http://localhost:5000/create-order", {
-        amount: project.price * 100, // amount in paise
+        amount: project.price * 100,
         currency: "INR",
       });
 
       const { id: orderId, currency, amount } = orderRes.data;
 
-      // Open Razorpay checkout
       const options = {
         key: process.env.REACT_APP_RAZORPAY_KEY,
         amount,
@@ -83,16 +115,16 @@ const PurchasePage = () => {
               signature: response.razorpay_signature,
             });
 
-            alert("Payment successful! Download link: " + purchaseRes.data.link);
+            alert(
+              "✅ Payment successful! Download link sent to your email: " 
+               
+            );
           } catch (err) {
             console.error("Purchase error:", err);
             alert("Payment succeeded but something went wrong: " + err.response?.data?.error);
           }
         },
-        prefill: {
-          name: userName,
-          email: userEmail,
-        },
+        prefill: { name: userName, email: userEmail },
         theme: { color: "#4a6cf7" },
       };
 
@@ -106,34 +138,37 @@ const PurchasePage = () => {
     }
   };
 
-  if (loading) return (
-    <div className="loading-container">
-      <div className="loading-spinner"></div>
-      <p>Loading project details...</p>
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Loading project details...</p>
+      </div>
+    );
 
-  if (!project) return (
-    <div className="error-container">
-      <h2>Project Not Found</h2>
-      <p>The project you're looking for doesn't exist or has been removed.</p>
-    </div>
-  );
+  if (!project)
+    return (
+      <div className="error-container">
+        <h2>Project Not Found</h2>
+        <p>The project you're looking for doesn't exist or has been removed.</p>
+      </div>
+    );
 
   return (
     <div className="purchase-page">
       <Navbar />
       <div className="purchase-container">
         <div className="purchase-content">
-          {/* Image Gallery Section */}
+          {/* Image Section */}
           <div className="image-section">
             <div className="main-image">
-              <img 
-                src={project.thumbnailUrl} 
-                alt={project.name} 
+              <img
+                src={project.thumbnailUrl}
+                alt={project.name}
                 className="project-image"
                 onError={(e) => {
-                  e.target.src = 'https://via.placeholder.com/600x400/1a1a1a/4a6cf7?text=Project+Image';
+                  e.target.src =
+                    "https://via.placeholder.com/600x400/1a1a1a/4a6cf7?text=Project+Image";
                 }}
               />
             </div>
@@ -144,13 +179,13 @@ const PurchasePage = () => {
             <div className="breadcrumb">
               <span>Projects</span>
               <span className="divider">/</span>
-              <span>{project.category || 'Development'}</span>
+              <span>{project.category || "Development"}</span>
               <span className="divider">/</span>
               <span className="current">{project.name}</span>
             </div>
 
             <h1 className="project-title">{project.name}</h1>
-            
+
             <div className="project-meta">
               <span className={`project-type ${project.type?.toLowerCase()}`}>
                 {project.type}
@@ -164,31 +199,9 @@ const PurchasePage = () => {
             <div className="description-preview">
               <p>{project.description.substring(0, 100)}...</p>
               <button className="view-description-btn" onClick={toggleDescription}>
-                {showDescription ? 'Hide Description' : 'Click to View Full Description'}
-                <span className="arrow-icon">{showDescription ? '↑' : '↓'}</span>
+                {showDescription ? "Hide Description" : "Click to View Full Description"}
+                <span className="arrow-icon">{showDescription ? "↑" : "↓"}</span>
               </button>
-            </div>
-
-            {/* User details inputs */}
-            <div className="user-details">
-              <label>
-                Name:
-                <input
-                  type="text"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="Enter your name"
-                />
-              </label>
-              <label>
-                Email:
-                <input
-                  type="email"
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                  placeholder="Enter your email"
-                />
-              </label>
             </div>
 
             <div className="pricing-section">
@@ -199,9 +212,9 @@ const PurchasePage = () => {
               </div>
 
               <div className="purchase-actions">
-                <button 
-                  className={`purchase-button ${purchasing ? 'purchasing' : ''}`}
-                  onClick={handlePurchase}
+                <button
+                  className={`purchase-button ${purchasing ? "purchasing" : ""}`}
+                  onClick={startPurchase}
                   disabled={purchasing}
                 >
                   {purchasing ? (
@@ -210,7 +223,7 @@ const PurchasePage = () => {
                       Processing...
                     </>
                   ) : (
-                    'Purchase Now'
+                    "Purchase Now"
                   )}
                 </button>
               </div>
@@ -218,7 +231,94 @@ const PurchasePage = () => {
           </div>
         </div>
 
-        {/* Additional Information Section - Description Only */}
+        {/* Name + Email Popup Form */}
+        {showForm && (
+          <div className="popup-overlay">
+            <div className="popup-form">
+              <h2>Complete Your Purchase</h2>
+              <p>Enter your details to proceed</p>
+              <form onSubmit={handleFormSubmit}>
+                <div className="form-group">
+                  <label htmlFor="userName">Full Name</label>
+                  <input
+                    id="userName"
+                    type="text"
+                    className="form-input"
+                    value={userName}
+                    onChange={(e) => setUserName(e.target.value)}
+                    placeholder="Enter your full name"
+                    autoFocus
+                  />
+                  <span className="input-icon">👤</span>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="userEmail">Email Address</label>
+                  <input
+                    id="userEmail"
+                    type="email"
+                    className="form-input"
+                    value={userEmail}
+                    onChange={(e) => setUserEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                  />
+                  <span className="input-icon">✉️</span>
+                </div>
+                <div className="popup-actions">
+                  <button type="submit" className="submit-btn">
+                    Continue
+                    <span className="arrow-icon">→</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="cancel-btn"
+                    onClick={() => setShowForm(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="form-footer">
+                  Your information is secure and will only be used for this transaction
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* OTP Popup Form */}
+        {showOtpForm && (
+          <div className="popup-overlay">
+            <div className="popup-form">
+              <h2>Verify OTP</h2>
+              <p>Enter the OTP sent to {userEmail}</p>
+              <form onSubmit={handleOtpSubmit}>
+                <div className="form-group">
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value)}
+                    placeholder="Enter OTP"
+                    autoFocus
+                  />
+                </div>
+                <div className="popup-actions">
+                  <button type="submit" className="submit-btn">
+                    Verify OTP
+                  </button>
+                  <button
+                    type="button"
+                    className="cancel-btn"
+                    onClick={() => setShowOtpForm(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Description Section */}
         <div ref={descriptionRef}>
           {showDescription && (
             <div className="additional-info">
@@ -234,16 +334,13 @@ const PurchasePage = () => {
                   <h3>What's Included</h3>
                   <div className="included-items">
                     <div className="included-item">
-                      <span className="item-icon">📁</span>
-                      <span>Source Files</span>
+                      <span className="item-icon">📁</span> Source Files
                     </div>
                     <div className="included-item">
-                      <span className="item-icon">🛠️</span>
-                      <span>Setup Guide</span>
+                      <span className="item-icon">🛠️</span> Setup Guide
                     </div>
                     <div className="included-item">
-                      <span className="item-icon">📚</span>
-                      <span>PPTs</span>
+                      <span className="item-icon">📚</span> PPTs
                     </div>
                   </div>
                 </div>
@@ -251,7 +348,6 @@ const PurchasePage = () => {
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

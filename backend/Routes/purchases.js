@@ -46,53 +46,48 @@ router.post('/', async (req, res) => {
     try {
         // ✅ Verify Razorpay payment
         const isValid = verifyRazorpaySignature(orderId, paymentId, signature);
-        if (!isValid) {
-            return res.status(400).json({ error: 'Payment verification failed' });
-        }
+        if (!isValid) return res.status(400).json({ error: 'Payment verification failed' });
 
-        // ✅ Get project metadata from Firestore
+        // ✅ Get project metadata
         const projectRef = db.collection('projects').doc(projectId);
         const project = await projectRef.get();
-        if (!project.exists) {
-            return res.status(404).json({ error: 'Project not found' });
-        }
+        if (!project.exists) return res.status(404).json({ error: 'Project not found' });
 
         const projectData = project.data();
-        const fileUrl = projectData.fileUrl; // stored in Firestore when you uploaded
-        if (!fileUrl) {
-            return res.status(400).json({ error: 'Project file URL missing' });
-        }
+        if (!projectData.fileUrl) return res.status(400).json({ error: 'Project file URL missing' });
 
         // ✅ Generate signed download link
-        const downloadLink = await generateTempLink(fileUrl);
+        const downloadLink = await generateTempLink(projectData.fileUrl);
 
-        // ✅ Save purchase record in Firestore
+        // ✅ Save purchase in Firestore
         const purchaseDoc = createPurchase({
             name,
             email,
             projectId,
             projectName: projectData.name,
             downloadLink,
-            expiresAt: new Date(Date.now() + 60 * 60 * 1000) // 1 hour expiry
+            expiresAt: new Date(Date.now() + 60 * 60 * 1000)
         });
-
         await db.collection('purchases').add(purchaseDoc);
+
+        // ✅ Send email (catch errors separately so they don't block response)
+        try {
+            await sendEmail(email, downloadLink);
+        } catch (emailErr) {
+            console.error("Email sending failed:", emailErr);
+        }
+
+        // ✅ Send response **only once**
         res.json({
-    message: 'Payment successful. Download link generated.',
-    link: downloadLink
-});
-
-        // ✅ Send email with download link
-        // await sendEmail(email, downloadLink);
-
-        // res.json({
-        //     message: 'Payment successful. Download link sent to your email.',
-        //     link: downloadLink // optional: return it directly too
-        // });
+            message: 'Payment successful. Download link generated.',
+            link: downloadLink
+        });
 
     } catch (err) {
         console.error("Purchase error:", err);
-        res.status(500).json({ error: err.message });
+        if (!res.headersSent) {
+            res.status(500).json({ error: err.message });
+        }
     }
 });
 
